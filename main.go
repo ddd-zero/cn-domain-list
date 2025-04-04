@@ -37,6 +37,9 @@ func main() {
 	sl := strings.Split(string(b), "\n")
 	donmainLen := len(sl)
 
+	f := lo.Must(os.Create("domain.log"))
+	defer f.Close()
+
 	bar := progressbar.Default(int64(donmainLen))
 	for _, txt := range sl {
 		if _, ok := set[txt]; ok {
@@ -62,6 +65,7 @@ func main() {
 				if c.Country.IsoCode == "CN" {
 					dlLock.Lock()
 					dl = append(dl, txt)
+					f.WriteString(txt + "\n")
 					dlLock.Unlock()
 				}
 				return nil
