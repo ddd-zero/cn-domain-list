@@ -31,5 +31,5 @@ func dnsHttp(ctx context.Context, domain string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return gjson.GetBytes(b, "Answer.0.data").String(), nil
+	return gjson.GetBytes(b, "Answer.@reverse.0.data").String(), nil
 }
