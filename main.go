@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -29,20 +28,30 @@ func main() {
 	ctx := context.Background()
 
 	g, gCtx := errgroup.WithContext(ctx)
-	g.SetLimit(runtime.GOMAXPROCS(0))
+	g.SetLimit(8)
 
-	dl := []string{}
+	dl := readLog()
+	last := dl[len(dl)-1]
 	dlLock := &sync.Mutex{}
 
 	sl := strings.Split(string(b), "\n")
 	donmainLen := len(sl)
 
-	f := lo.Must(os.Create("domain.log"))
+	f := lo.Must(os.OpenFile("domain.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644))
 	defer f.Close()
 
 	bar := progressbar.Default(int64(donmainLen))
+	skip := true
 	for _, txt := range sl {
+		if last == txt {
+			skip = false
+		}
+		if skip {
+			bar.Add(1)
+			continue
+		}
 		if _, ok := set[txt]; ok {
+			bar.Add(1)
 			continue
 		}
 		g.Go(func() error {
@@ -89,15 +98,25 @@ func main() {
 }
 
 func geosite() map[string]struct{} {
-	b := lo.Must(os.ReadFile("geosite-geolocation-cn.json"))
+	m := map[string]struct{}{}
+	readGeoSite("geosite-geolocation-cn.json", m)
+	readGeoSite("geosite-geolocation-!cn.json", m)
+	return m
+}
+
+func readGeoSite(filename string, set map[string]struct{}) {
+	b := lo.Must(os.ReadFile(filename))
 	r := gjson.ParseBytes(b)
 	dl := r.Get("rules.0.domain")
-	m := map[string]struct{}{}
 	dl.ForEach(func(key, value gjson.Result) bool {
-		m[value.String()] = struct{}{}
+		set[value.String()] = struct{}{}
 		return true
 	})
-	return m
+}
+
+func readLog() []string {
+	b := lo.Must(os.ReadFile("domain.log"))
+	return strings.Split(string(b), "\n")
 }
 
 var retryOpts = []retry.Option{
