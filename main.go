@@ -30,8 +30,7 @@ func main() {
 	g, gCtx := errgroup.WithContext(ctx)
 	g.SetLimit(8)
 
-	dl := readLog()
-	last := dl[len(dl)-1]
+	dl, last := readLog(set)
 	dlLock := &sync.Mutex{}
 
 	sl := strings.Split(string(b), "\n")
@@ -44,7 +43,9 @@ func main() {
 	skip := true
 	for _, txt := range sl {
 		if last == txt {
+			bar.Add(1)
 			skip = false
+			continue
 		}
 		if skip {
 			bar.Add(1)
@@ -82,11 +83,10 @@ func main() {
 		})
 	}
 	lo.Must0(g.Wait())
-
 	geo := geo{
 		Version: 1,
 		Rules: rule{
-			DomainSuffix: dl,
+			DomainSuffix: lo.Uniq(dl),
 		},
 	}
 	nf := lo.Must(os.Create("ext-cn-list.json"))
@@ -114,9 +114,17 @@ func readGeoSite(filename string, set map[string]struct{}) {
 	})
 }
 
-func readLog() []string {
+func readLog(set map[string]struct{}) ([]string, string) {
 	b := lo.Must(os.ReadFile("domain.log"))
-	return strings.Split(string(b), "\n")
+	list := strings.Split(string(b), "\n")
+	var last string
+	return lo.Filter(list, func(item string, index int) bool {
+		_, ok := set[item]
+		if !ok && item != "" {
+			last = item
+		}
+		return !ok
+	}), last
 }
 
 var retryOpts = []retry.Option{
