@@ -42,7 +42,7 @@ func main() {
 	bar := progressbar.Default(int64(donmainLen))
 	skip := true
 	for _, txt := range sl {
-		if last == txt {
+		if skip && (last == txt || last == "") {
 			bar.Add(1)
 			skip = false
 			continue
@@ -115,7 +115,10 @@ func readGeoSite(filename string, set map[string]struct{}) {
 }
 
 func readLog(set map[string]struct{}) ([]string, string) {
-	b := lo.Must(os.ReadFile("domain.log"))
+	b, err := os.ReadFile("domain.log")
+	if err != nil {
+		return []string{}, ""
+	}
 	list := strings.Split(string(b), "\n")
 	var last string
 	return lo.Filter(list, func(item string, index int) bool {
