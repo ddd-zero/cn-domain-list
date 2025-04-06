@@ -28,7 +28,7 @@ func main() {
 	ctx := context.Background()
 
 	g, gCtx := errgroup.WithContext(ctx)
-	g.SetLimit(8)
+	g.SetLimit(32)
 
 	dl, last := readLog(set)
 	dlLock := &sync.Mutex{}
