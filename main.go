@@ -83,10 +83,16 @@ func main() {
 		})
 	}
 	lo.Must0(g.Wait())
+	uList := lo.Uniq(dl)
 	geo := geo{
 		Version: 1,
-		Rules: rule{
-			DomainSuffix: lo.Uniq(dl),
+		Rules: []rule{
+			{
+				DomainSuffix: lo.Map(uList, func(item string, index int) string {
+					return "." + item
+				}),
+				Domain: uList,
+			},
 		},
 	}
 	nf := lo.Must(os.Create("ext-cn-list.json"))
@@ -139,10 +145,11 @@ var retryOpts = []retry.Option{
 }
 
 type geo struct {
-	Version int  `json:"version"`
-	Rules   rule `json:"rules"`
+	Version int    `json:"version"`
+	Rules   []rule `json:"rules"`
 }
 
 type rule struct {
 	DomainSuffix []string `json:"domain_suffix"`
+	Domain       []string `json:"domain"`
 }
