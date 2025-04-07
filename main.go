@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -90,6 +91,7 @@ func main() {
 		})
 	}
 	lo.Must0(g.Wait())
+	slices.Sort(dl)
 	uList := lo.Uniq(dl)
 	uList = lo.Filter(uList, func(item string, index int) bool {
 		return item != ""
