@@ -60,9 +60,16 @@ func main() {
 			return retry.Do(func() error {
 				ctx, cancel := context.WithTimeout(gCtx, 10*time.Second)
 				defer cancel()
-				addr, err := dnsHttp(ctx, txt)
-				if err != nil {
-					return err
+				addrs := []string{txt, "www." + txt}
+				var addr string
+				for _, a := range addrs {
+					addr, err := dnsHttp(ctx, a)
+					if err != nil {
+						return err
+					}
+					if addr != "" {
+						break
+					}
 				}
 				if addr == "" {
 					return nil
@@ -84,6 +91,9 @@ func main() {
 	}
 	lo.Must0(g.Wait())
 	uList := lo.Uniq(dl)
+	uList = lo.Filter(uList, func(item string, index int) bool {
+		return item != ""
+	})
 	geo := geo{
 		Version: 1,
 		Rules: []rule{
