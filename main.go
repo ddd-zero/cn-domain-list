@@ -40,12 +40,11 @@ func main() {
 	defer f.Close()
 
 	bar := progressbar.Default(int64(donmainLen))
-	skip := true
+	skip := last != ""
 	for _, txt := range sl {
-		if skip && (last == txt || last == "") {
+		if skip && last == txt {
 			bar.Add(1)
 			skip = false
-			continue
 		}
 		if skip {
 			bar.Add(1)
@@ -62,8 +61,9 @@ func main() {
 				defer cancel()
 				addrs := []string{txt, "www." + txt}
 				var addr string
+				var err error
 				for _, a := range addrs {
-					addr, err := dnsHttp(ctx, a)
+					addr, err = dnsHttp(ctx, a)
 					if err != nil {
 						return err
 					}
