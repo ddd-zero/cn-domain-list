@@ -117,7 +117,6 @@ func main() {
 
 func geosite() map[string]struct{} {
 	m := map[string]struct{}{}
-	readGeoSite("geosite-geolocation-cn.json", m)
 	readGeoSite("geosite-geolocation-!cn.json", m)
 	return m
 }
