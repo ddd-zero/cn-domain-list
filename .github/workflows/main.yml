@@ -1,0 +1,64 @@
+name: Convert cn-domain-list to Mihomo format
+
+on:
+  push:
+    branches:
+      - 'rule-set'
+  schedule:
+    - cron: '0 0 * * *' # 每天 UTC 时间 0 点执行一次
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: 'rule-set'
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+
+    - name: Download and build mihomo
+      run: |
+        git clone https://github.com/MetaCubeX/mihomo.git
+        cd mihomo
+        go build
+        sudo mv mihomo /usr/local/bin/
+
+    - name: Process JSON and create YAML
+      id: process_json
+      run: |
+        # 从 ext-cn-list.json 提取 domain 和 domain_suffix
+        domains=$(jq -r '.rules[0].domain[]' ext-cn-list.json)
+        domain_suffixes=$(jq -r '.rules[0].domain_suffix[]' ext-cn-list.json)
+
+        # 合并并创建 YAML 文件
+        echo "payload:" > cn-domain-list.yaml
+        while IFS= read -r domain; do
+          echo "  - '$domain'" >> cn-domain-list.yaml
+        done <<< "$domains"
+        while IFS= read -r suffix; do
+          # Mihomo 的 domain 类型规则，裸域名和 . 开头的域名后缀都可以被正确处理
+          echo "  - '$suffix'" >> cn-domain-list.yaml
+        done <<< "$domain_suffixes"
+        echo "Created cn-domain-list.yaml"
+
+    - name: Convert to mrs format
+      run: |
+        mihomo convert-ruleset domain yaml cn-domain-list.yaml cn-domain-list.mrs
+        echo "Converted to cn-domain-list.mrs"
+
+    - name: Commit and push changes
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "Automated update of Mihomo rule files"
+        branch: rule-set
+        file_pattern: '*.yaml *.mrs'
+        commit_user_name: GitHub Actions
+        commit_user_email: actions@github.com
+        commit_author: GitHub Actions <actions@github.com>
