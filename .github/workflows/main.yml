@@ -1,24 +1,27 @@
-name: Convert CN Domain List
+name: Convert Rules and Push to rule-set branch
 
-# 触发器配置
+# 触发器配置 (此文件在 main 分支)
 on:
-  # 允许在 Actions 页面手动触发
+  # 允许在 Actions 页面手动触发 (将运行 main 分支的此 workflow)
   workflow_dispatch:
 
-  # 每天定时在 UTC 时间 0 点执行
+  # 每天定时执行 (也将运行 main 分支的此 workflow)
   schedule:
     - cron: '0 0 * * *'
 
 jobs:
-  build-rules:
+  build-and-commit-to-ruleset:
     runs-on: ubuntu-latest
     steps:
-      # 步骤 1: 检出您自己的仓库，以便后续可以提交生成的文件
-      - name: Checkout self repository
+      # 步骤 1: 明确检出 'rule-set' 分支
+      # 这是最关键的修改。工作流将在这个分支的内容上进行操作。
+      - name: Checkout 'rule-set' branch
         uses: actions/checkout@v4
+        with:
+          # 指定要操作的分支名
+          ref: 'rule-set'
 
-      # 步骤 2: 检出源数据仓库 (cn-domain-list)
-      # 我们将其内容下载到一个名为 'cn-domain-list-source' 的子目录中
+      # 步骤 2: 检出源数据仓库 (这部分不变)
       - name: Checkout source repository
         uses: actions/checkout@v4
         with:
@@ -26,51 +29,33 @@ jobs:
           ref: rule-set
           path: cn-domain-list-source
 
-      # 步骤 3: 执行转换
+      # 步骤 3: 执行转换 (这部分不变)
       - name: Convert to various formats
         run: |
-          # 定义源文件路径
           SOURCE_JSON="cn-domain-list-source/ext-cn-list.json"
-
           # --- 生成 .mrs 文件 ---
-          echo "Generating .mrs file..."
-          # 从 domain_suffix 数组生成 DOMAIN-SUFFIX 规则
           jq -r '.domain_suffix[] | "DOMAIN-SUFFIX," + .' $SOURCE_JSON > suffix.tmp
-          # 从 domain 数组生成 DOMAIN 规则
           jq -r '.domain[] | "DOMAIN," + .' $SOURCE_JSON > domain.tmp
-          # 合并成最终的 cn-list.mrs 文件
           cat suffix.tmp domain.tmp > cn-list.mrs
-          echo "cn-list.mrs generated."
-
           # --- 生成 Clash YAML 文件 ---
-          echo "Generating Clash YAML file..."
-          # YAML 文件头部
           echo "payload:" > cn-list.yaml
-          # 从 domain_suffix 数组生成 YAML 格式规则并追加
           jq -r '.domain_suffix[] | "  - '\''DOMAIN-SUFFIX," + . + "'\''"' $SOURCE_JSON >> cn-list.yaml
-          # 从 domain 数组生成 YAML 格式规则并追加
           jq -r '.domain[] | "  - '\''DOMAIN," + . + "'\''"' $SOURCE_JSON >> cn-list.yaml
-          echo "cn-list.yaml generated."
-
-          # 清理临时文件
           rm suffix.tmp domain.tmp
 
-      # 步骤 4: 提交并推送文件到您的仓库
+      # 步骤 4: 提交并推送到 'rule-set' 分支
+      # 因为我们在步骤 1 已经检出了 'rule-set' 分支，
+      # 所以这里的 git 命令会自动推送到 'rule-set'。
       - name: Commit and push files
         run: |
-          # 配置 Git 用户信息
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-
-          # 添加所有生成的文件到暂存区
           git add cn-list.mrs cn-list.yaml
-
-          # 检查是否有文件变动，如果有则提交
-          # "git diff --staged --quiet" 会在有变动时返回 1，无变动时返回 0
           if ! git diff --staged --quiet; then
             git commit -m "Update rule files"
+            # git push 会自动推送到当前检出的分支，即 'rule-set'
             git push
-            echo "Changes committed and pushed."
+            echo "Changes committed and pushed to rule-set branch."
           else
             echo "No changes to commit."
           fi
