@@ -22,18 +22,18 @@ jobs:
       run: |
         set -e # 如果任何命令失败，立即退出脚本
         
-        # 从 GitHub API 获取最新的 linux-amd64 版本的下载链接
-        MIHOMO_URL=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/latest | jq -r '.assets[] | select(.name | contains("linux-amd64")) | .browser_download_url')
+        # 从 GitHub API 获取最新的 release 信息，并精确筛选出 compatible 版本的 linux-amd64 压缩包
+        MIHOMO_URL=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/latest | jq -r '.assets[] | select(.name | test("mihomo-linux-amd64-compatible.*\\.gz$")) | .browser_download_url')
         
         # 检查是否成功获取到 URL
         if [ -z "$MIHOMO_URL" ]; then
-          echo "Error: Could not find Mihomo download URL from GitHub API."
+          echo "Error: Could not find Mihomo compatible binary download URL."
           exit 1
         fi
         
         echo "Downloading Mihomo from: $MIHOMO_URL"
         
-        # 下载文件，-L 选项可以跟随重定向
+        # 下载文件
         curl -L -o mihomo.gz "$MIHOMO_URL"
         
         # 解压、赋予权限并移动到系统路径
