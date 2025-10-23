@@ -5,7 +5,7 @@ on:
     branches:
       - 'rule-set'
   schedule:
-    - cron: '0 0 * * *' # 每天 UTC 时间 0 点执行一次
+    - cron: '0 0 * * *' # 每天 UTC 时间 0 点执行一次，以同步上游更新
   workflow_dispatch: # 允许手动触发
 
 jobs:
@@ -18,17 +18,21 @@ jobs:
       with:
         ref: 'rule-set'
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.22'
-
-    - name: Download and build mihomo
+    - name: Download latest Mihomo binary
       run: |
-        git clone https://github.com/MetaCubeX/mihomo.git
-        cd mihomo
-        go build
+        # 从 GitHub API 获取最新的 release 信息
+        LATEST_URL=$(curl -sL "https://api.github.com/repos/MetaCubeX/mihomo/releases/latest" | jq -r '.assets[] | select(.name | test("mihomo-linux-amd64-v[0-9].+\\.gz$")) | .browser_download_url')
+        
+        # 下载并解压
+        curl -sL -o mihomo.gz "$LATEST_URL"
+        gunzip mihomo.gz
+        
+        # 赋予执行权限并移动到 PATH
+        chmod +x mihomo
         sudo mv mihomo /usr/local/bin/
+        
+        # 验证版本
+        mihomo -v
 
     - name: Process JSON and create YAML
       id: process_json
@@ -43,7 +47,7 @@ jobs:
           echo "  - '$domain'" >> cn-domain-list.yaml
         done <<< "$domains"
         while IFS= read -r suffix; do
-          # Mihomo 的 domain 类型规则，裸域名和 . 开头的域名后缀都可以被正确处理
+          # Mihomo 的 domain 类型规则，裸域名和以 '.' 开头的域名后缀都可以被正确处理
           echo "  - '$suffix'" >> cn-domain-list.yaml
         done <<< "$domain_suffixes"
         echo "Created cn-domain-list.yaml"
