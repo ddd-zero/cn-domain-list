@@ -5,7 +5,7 @@ on:
     branches:
       - 'rule-set'
   schedule:
-    - cron: '0 0 * * *' # 每天 UTC 时间 0 点执行一次，以同步上游更新
+    - cron: '0 0 1 * *' # 每天 UTC 时间 0 点执行一次，以同步上游更新
   workflow_dispatch: # 允许手动触发
 
 jobs:
@@ -45,31 +45,38 @@ jobs:
         echo "Mihomo installed successfully:"
         mihomo -v
 
-    - name: Process JSON and create YAML
+    - name: Process JSON and create YAML in Classic Format
       run: |
-        # 从 ext-cn-list.json 提取 domain 和 domain_suffix
-        domains=$(jq -r '.rules[0].domain[]' ext-cn-list.json)
-        domain_suffixes=$(jq -r '.rules[0].domain_suffix[]' ext-cn-list.json)
+        set -e
 
-        # 合并并创建 YAML 文件
+        # 创建 YAML 文件并写入 payload 头部
         echo "payload:" > cn-domain-list.yaml
-        while IFS= read -r domain; do
-          echo "  - '$domain'" >> cn-domain-list.yaml
-        done <<< "$domains"
-        while IFS= read -r suffix; do
-          echo "  - '$suffix'" >> cn-domain-list.yaml
-        done <<< "$domain_suffixes"
-        echo "Created cn-domain-list.yaml"
+
+        echo "Processing domain suffixes..."
+        # 读取 domain_suffix 数组，移除每个后缀的前导点，并格式化为 DOMAIN-SUFFIX 规则
+        jq -r '.rules[0].domain_suffix[]' ext-cn-list.json | while IFS= read -r suffix; do
+          # 使用 shell 参数扩展移除前导 '.'
+          echo "  - DOMAIN-SUFFIX,${suffix#.}" >> cn-domain-list.yaml
+        done
+
+        echo "Processing domains..."
+        # 读取 domain 数组，并格式化为 DOMAIN 规则
+        jq -r '.rules[0].domain[]' ext-cn-list.json | while IFS= read -r domain; do
+          echo "  - DOMAIN,${domain}" >> cn-domain-list.yaml
+        done
+        
+        echo "Created cn-domain-list.yaml in classic format."
 
     - name: Convert to mrs format
       run: |
-        mihomo convert-ruleset domain yaml cn-domain-list.yaml cn-domain-list.mrs
-        echo "Converted to cn-domain-list.mrs"
+        # 使用 'classic' 作为规则类型来转换新的 YAML 格式
+        mihomo convert-ruleset classic yaml cn-domain-list.yaml cn-domain-list.mrs
+        echo "Converted classic YAML to cn-domain-list.mrs"
 
     - name: Commit and push changes
       uses: stefanzweifel/git-auto-commit-action@v5
       with:
-        commit_message: "Automated update of Mihomo rule files"
+        commit_message: "Automated update of Mihomo rule files (classic format)"
         branch: rule-set
         file_pattern: '*.yaml *.mrs'
         commit_user_name: GitHub Actions
